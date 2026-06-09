@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>String Encryption — How It Works</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg:#0b0b0e; --s1:#111118; --s2:#17171f; --s3:#1e1e28;
+  --b1:#252535; --b2:#32324a; --b3:#42425a;
+  --txt:#e6e6f0; --mu:#6e6e90; --fa:#2a2a3e;
+  --pu:#a07ef6; --pu2:#5a3ea0; --pub:#1a1430;
+  --am:#f2a83c; --am2:#704e18; --amb:#1c1408;
+  --gr:#44cc88; --gr2:#1a5035; --grb:#0b1c12;
+  --re:#f06060; --re2:#5a2020; --reb:#1c0c0c;
+  --bl:#58b4f2; --bl2:#1c3a5a; --blb:#0b1520;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font-family:'Inter',sans-serif;font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+.page{max-width:820px;margin:0 auto;padding:0 2rem 8rem}
+
+/* ── HERO ── */
+.hero{padding:5rem 0 4rem;border-bottom:1px solid var(--b1);position:relative;overflow:hidden}
+.hero-scan{position:absolute;top:0;left:-100%;width:60%;height:100%;background:linear-gradient(90deg,transparent,rgba(160,126,246,.06),transparent);animation:scan 3.5s ease-in-out infinite}
+@keyframes scan{0%{left:-60%}100%{left:120%}}
+.hero-eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--pu);margin-bottom:1.25rem;opacity:0;animation:fadeUp .6s .1s forwards}
+.hero h1{font-size:clamp(2rem,5vw,3.4rem);font-weight:300;line-height:1.12;letter-spacing:-.025em;margin-bottom:1.25rem;opacity:0;animation:fadeUp .7s .25s forwards}
+.hero h1 strong{font-weight:600;color:var(--pu)}
+.hero-sub{font-size:16px;color:var(--mu);max-width:560px;line-height:1.8;opacity:0;animation:fadeUp .7s .4s forwards}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* ── PIPELINE HERO VIZ ── */
+.pipeline-wrap{margin-top:2.5rem;opacity:0;animation:fadeUp .8s .6s forwards}
+.pipeline{display:flex;align-items:center;gap:0;position:relative;padding:1.5rem;background:var(--s1);border:1px solid var(--b1);border-radius:14px;overflow:hidden}
+.pipeline-flow{position:absolute;top:0;left:-100%;width:40%;height:100%;background:linear-gradient(90deg,transparent,rgba(160,126,246,.04),transparent);animation:pflow 2.8s linear infinite}
+@keyframes pflow{0%{left:-40%}100%{left:120%}}
+.pl-node{flex:1;text-align:center;position:relative;z-index:1}
+.pl-box{display:inline-block;padding:.5rem .9rem;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;border:1px solid;white-space:nowrap;transition:transform .2s}
+.pl-box:hover{transform:translateY(-2px)}
+.pl-plain{background:var(--s2);border-color:var(--b2);color:var(--txt)}
+.pl-key{background:var(--amb);border-color:var(--am2);color:var(--am)}
+.pl-enc{background:var(--pub);border-color:var(--pu2);color:var(--pu)}
+.pl-bin{background:var(--s3);border-color:var(--b2);color:var(--mu)}
+.pl-out{background:var(--grb);border-color:var(--gr2);color:var(--gr)}
+.pl-label{font-size:10px;color:var(--mu);margin-top:.4rem;font-family:'JetBrains Mono',monospace;letter-spacing:.04em}
+.pl-arrow{flex-shrink:0;width:28px;display:flex;align-items:center;justify-content:center;position:relative;z-index:1}
+.pl-arrow svg{width:16px;height:16px;stroke:var(--b3);fill:none;stroke-width:1.5}
+.pl-dot{width:5px;height:5px;border-radius:50%;background:var(--pu);position:absolute;top:50%;left:0;transform:translateY(-50%);animation:dotflow 2.8s linear infinite;opacity:0}
+.pl-arrow:nth-child(2) .pl-dot{animation-delay:0s}
+.pl-arrow:nth-child(4) .pl-dot{animation-delay:.56s}
+.pl-arrow:nth-child(6) .pl-dot{animation-delay:1.12s}
+.pl-arrow:nth-child(8) .pl-dot{animation-delay:1.68s}
+.pl-arrow:nth-child(10) .pl-dot{animation-delay:2.24s}
+@keyframes dotflow{0%{left:0;opacity:0}10%{opacity:1}90%{opacity:1}100%{left:100%;opacity:0}}
+
+/* ── SECTIONS ── */
+.section{padding:4.5rem 0 0}
+.sec-label{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--mu);margin-bottom:.5rem}
+.section h2{font-size:1.65rem;font-weight:500;letter-spacing:-.018em;margin-bottom:1rem}
+.section>.sec-intro{color:var(--mu);max-width:600px;margin-bottom:2rem}
+hr.div{border:none;border-top:1px solid var(--b1);margin:0}
+
+/* ── SCROLL REVEAL ── */
+.rv{opacity:0;transform:translateY(20px);transition:opacity .55s ease,transform .55s ease}
+.rv.in{opacity:1;transform:none}
+.rv.in .analogy-item{animation:cardIn .4s ease both}
+.rv.in .analogy-item:nth-child(1){animation-delay:.05s}
+.rv.in .analogy-item:nth-child(2){animation-delay:.1s}
+.rv.in .analogy-item:nth-child(3){animation-delay:.15s}
+.rv.in .analogy-item:nth-child(4){animation-delay:.2s}
+.rv.in .analogy-item:nth-child(5){animation-delay:.25s}
+.rv.in .analogy-item:nth-child(6){animation-delay:.3s}
+@keyframes cardIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* ── ANALOGY ── */
+.analogy-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1.5rem}
+@media(max-width:520px){.analogy-grid{grid-template-columns:1fr}}
+.analogy-item{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:1.25rem;transition:border-color .2s,transform .2s}
+.analogy-item:hover{border-color:var(--b2);transform:translateY(-2px)}
+.an-icon{width:34px;height:34px;background:var(--pub);border:1px solid var(--pu2);border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:.75rem}
+.an-icon svg{width:17px;height:17px;stroke:var(--pu);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.analogy-item h4{font-size:13px;font-weight:600;margin-bottom:.3rem}
+.analogy-item p{font-size:13px;color:var(--mu);line-height:1.6}
+
+/* ── STEP TIMELINE ── */
+.steps{position:relative;padding-left:2.2rem;margin-top:1.5rem}
+.steps::before{content:'';position:absolute;left:8px;top:10px;bottom:0;width:1px;background:linear-gradient(to bottom,var(--pu2) 0%,transparent 100%)}
+.step{position:relative;margin-bottom:2rem;opacity:0;transform:translateX(-8px);transition:opacity .4s,transform .4s}
+.step.vis{opacity:1;transform:none}
+.step::before{content:'';position:absolute;left:-1.75rem;top:7px;width:9px;height:9px;border-radius:50%;background:var(--pu2);border:2px solid var(--pu);transition:background .3s,box-shadow .3s}
+.step.vis::before{background:var(--pu);box-shadow:0 0 0 4px rgba(160,126,246,.15),0 0 12px rgba(160,126,246,.4)}
+.step-head{font-size:13px;font-weight:600;color:var(--txt);margin-bottom:.3rem}
+.step-body{font-size:14px;color:var(--mu);line-height:1.65}
+.tag{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 7px;border-radius:4px;vertical-align:middle;margin-left:6px;letter-spacing:.04em}
+.tag.pu{background:var(--pub);color:var(--pu);border:1px solid var(--pu2)}
+.tag.am{background:var(--amb);color:var(--am);border:1px solid var(--am2)}
+.tag.gr{background:var(--grb);color:var(--gr);border:1px solid var(--gr2)}
+.tag.re{background:var(--reb);color:var(--re);border:1px solid var(--re2)}
+
+/* ── LIVE DEMO ── */
+.demo-shell{background:var(--s1);border:1px solid var(--b1);border-radius:14px;overflow:hidden;margin-top:1.5rem}
+.demo-topbar{display:flex;align-items:center;gap:.45rem;padding:.75rem 1rem;border-bottom:1px solid var(--b1);background:var(--s2)}
+.dot{width:10px;height:10px;border-radius:50%}
+.demo-title{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mu);margin-left:auto;letter-spacing:.07em}
+.demo-body{padding:1.75rem 1.5rem}
+
+.input-row{display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap}
+.input-row label{font-size:12px;color:var(--mu);font-family:'JetBrains Mono',monospace}
+.input-row input[type=text]{background:var(--s2);border:1px solid var(--b2);border-radius:6px;padding:.35rem .7rem;font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--txt);width:160px;outline:none;transition:border-color .15s}
+.input-row input[type=text]:focus{border-color:var(--pu2)}
+.input-row input[type=range]{accent-color:var(--am);width:90px;cursor:pointer}
+.range-val{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--am);min-width:30px}
+
+.ctrl-row{display:flex;align-items:center;gap:.65rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.dbtn{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.04em;padding:.4rem .95rem;border-radius:6px;border:1px solid var(--b2);background:var(--s2);color:var(--txt);cursor:pointer;transition:background .15s,border-color .15s,transform .1s}
+.dbtn:hover{background:var(--s3);border-color:var(--b3);transform:translateY(-1px)}
+.dbtn:active{transform:translateY(0)}
+.dbtn.prim{background:var(--pub);border-color:var(--pu2);color:var(--pu)}
+.dbtn.prim:hover{background:var(--pu2)}
+.dbtn:disabled{opacity:.3;cursor:not-allowed;transform:none}
+.key-badge{font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--amb);border:1px solid var(--am2);color:var(--am);padding:.3rem .75rem;border-radius:6px;margin-left:auto;transition:all .3s}
+
+/* ── CHAR STAGE ── */
+.char-stage{min-height:110px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;justify-content:center;margin-bottom:.75rem;position:relative}
+.char-cell{display:flex;flex-direction:column;align-items:center;gap:5px;position:relative}
+.char-letter{width:40px;height:46px;border-radius:8px;border:1px solid var(--b2);background:var(--s2);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:600;color:var(--txt);position:relative;overflow:hidden;transition:background .3s,border-color .3s,color .3s}
+.char-letter .ripple{position:absolute;inset:0;border-radius:inherit;background:var(--pu);opacity:0;pointer-events:none}
+.char-letter.enc{background:var(--amb);border-color:var(--am2);color:var(--am)}
+.char-letter.dec{background:var(--grb);border-color:var(--gr2);color:var(--gr)}
+.char-code-top{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mu);transition:color .3s}
+.char-code-bot{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--mu);min-width:24px;text-align:center;transition:color .3s}
+.char-cell.enc .char-code-top{color:var(--am2)}
+.char-cell.enc .char-code-bot{color:var(--am)}
+.char-cell.dec .char-code-bot{color:var(--gr)}
+
+/* counter animation */
+.counter{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--pu);white-space:nowrap;pointer-events:none;opacity:0}
+@keyframes counterUp{0%{opacity:0;transform:translateX(-50%) translateY(0)}30%{opacity:1}100%{opacity:0;transform:translateX(-50%) translateY(-22px)}}
+
+/* particle burst */
+.particle{position:absolute;width:4px;height:4px;border-radius:50%;pointer-events:none;opacity:0}
+@keyframes particleBurst{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--tx),var(--ty)) scale(0)}}
+
+.demo-status{font-size:12px;color:var(--mu);text-align:center;min-height:18px;font-family:'JetBrains Mono',monospace;letter-spacing:.03em;transition:color .3s,opacity .3s}
+.demo-status.enc{color:var(--am)}
+.demo-status.dec{color:var(--gr)}
+.demo-status.scan{color:var(--pu)}
+
+/* ── CIPHER TABLE ── */
+.cipher-wrap{overflow-x:auto;margin-top:1.5rem;border-radius:10px;border:1px solid var(--b1)}
+table{width:100%;border-collapse:collapse;min-width:520px}
+th{background:var(--s2);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mu);padding:.6rem .9rem;text-align:left;border-bottom:1px solid var(--b1);font-weight:400}
+td{padding:.55rem .9rem;border-bottom:1px solid var(--b1);font-family:'JetBrains Mono',monospace;font-size:13px;background:var(--s1);animation:rowIn .3s ease both}
+@keyframes rowIn{from{opacity:0;background:rgba(160,126,246,.05)}to{opacity:1;background:var(--s1)}}
+tr:last-child td{border-bottom:none}
+.tc-orig{color:var(--txt)}
+.tc-op{color:var(--mu);text-align:center}
+.tc-enc{color:var(--am)}
+.tc-dec{color:var(--gr)}
+
+/* ── BYTECODE ── */
+.bc-wrap{background:var(--s1);border:1px solid var(--b1);border-radius:12px;overflow:hidden;margin-top:1.5rem}
+.bc-head{display:flex;align-items:center;justify-content:space-between;padding:.6rem 1rem;background:var(--s2);border-bottom:1px solid var(--b1)}
+.bc-title{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mu);letter-spacing:.06em}
+.bc-toggle{font-family:'JetBrains Mono',monospace;font-size:11px;padding:3px 9px;border-radius:4px;border:1px solid var(--b2);background:transparent;color:var(--mu);cursor:pointer;transition:.15s}
+.bc-toggle:hover{border-color:var(--re2);color:var(--re)}
+.bc-body{padding:1rem}
+
+.instr{display:flex;align-items:center;gap:10px;padding:.4rem .5rem;border-radius:5px;cursor:default;transition:background .15s}
+.instr:hover{background:var(--s2)}
+.instr.entering{animation:instrSlide .28s ease both}
+@keyframes instrSlide{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}
+.i-op{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--bl);min-width:72px}
+.i-arg{font-family:'JetBrains Mono',monospace;font-size:12px;flex:1}
+.instr.ireal .i-arg{color:var(--pu)}
+.instr.ijunk .i-arg{color:var(--fa)}
+.instr.icall .i-arg{color:var(--gr)}
+.i-tag{font-family:'JetBrains Mono',monospace;font-size:10px;padding:2px 6px;border-radius:3px;border:1px solid}
+.instr.ireal .i-tag{background:var(--pub);color:var(--pu);border-color:var(--pu2)}
+.instr.ijunk .i-tag{background:var(--reb);color:var(--re);border-color:var(--re2)}
+.instr.icall .i-tag{background:var(--grb);color:var(--gr);border-color:var(--gr2)}
+
+/* scan animation overlay on bytecode body */
+.bc-scan{position:relative;overflow:hidden}
+.bc-scan::after{content:'';position:absolute;top:0;left:-100%;width:50%;height:100%;background:linear-gradient(90deg,transparent,rgba(90,180,242,.04),transparent);animation:bscan 2.4s linear infinite;pointer-events:none}
+@keyframes bscan{0%{left:-50%}100%{left:120%}}
+
+/* ── DECRYPT PANEL ── */
+.dec-split{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1.5rem}
+@media(max-width:560px){.dec-split{grid-template-columns:1fr}}
+.dec-panel{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:1.2rem}
+.dec-panel h4{font-size:11px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.85rem;font-weight:400}
+.dec-panel.used h4{color:var(--gr)}
+.dec-panel.ignore h4{color:var(--re)}
+.pline{display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:12px;padding:.28rem 0}
+.pname{color:var(--bl);min-width:52px}
+.pval{color:var(--txt)}
+.ptag{font-size:10px;padding:1px 5px;border-radius:3px;margin-left:auto;border:1px solid}
+.used .ptag{background:var(--grb);color:var(--gr);border-color:var(--gr2)}
+.ignore .ptag{background:var(--reb);color:var(--re);border-color:var(--re2)}
+
+/* ── INJECT ANIMATION ── */
+.inject-stage{background:var(--s1);border:1px solid var(--b1);border-radius:12px;padding:1.5rem;margin-top:1.5rem;min-height:260px;position:relative;overflow:hidden}
+.inject-title{font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--mu);margin-bottom:1rem}
+.inject-before{display:flex;flex-direction:column;gap:6px}
+.inject-instr{display:flex;align-items:center;gap:8px;padding:.35rem .6rem;border-radius:5px;border:1px solid var(--b1);background:var(--s2);font-family:'JetBrains Mono',monospace;font-size:12px;transition:all .4s ease;position:relative;overflow:hidden}
+.inject-instr.highlight{border-color:var(--pu2);background:var(--pub)}
+.inject-instr .i-op{font-size:12px}
+.inject-instr .i-arg{color:var(--txt)}
+.inject-instr.highlight .i-arg{color:var(--pu)}
+.new-instr{opacity:0;transform:translateX(20px) scale(.96);transition:all .35s ease}
+.new-instr.pop{opacity:1;transform:none}
+.new-instr.ijunk .i-arg{color:var(--re)}
+.new-instr.ireal .i-arg{color:var(--am)}
+.new-instr.icall .i-arg{color:var(--gr)}
+.inject-beam{position:absolute;top:0;left:0;width:2px;height:0;background:var(--pu);box-shadow:0 0 8px var(--pu);transition:height .4s ease;border-radius:1px}
+.inject-play-btn{display:inline-flex;align-items:center;gap:6px;margin-top:1rem;font-family:'JetBrains Mono',monospace;font-size:11px;padding:.35rem .85rem;border-radius:5px;border:1px solid var(--pu2);background:var(--pub);color:var(--pu);cursor:pointer;transition:.15s}
+.inject-play-btn:hover{background:var(--pu2)}
+
+/* ── CARDS ── */
+.card{background:var(--s1);border:1px solid var(--b1);border-radius:11px;padding:1.4rem;margin-bottom:.85rem}
+.card-title{font-size:13px;font-weight:600;margin-bottom:.4rem;color:var(--txt)}
+.card p{color:var(--mu);font-size:14px}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- HERO -->
+<header class="hero">
+  <div class="hero-scan"></div>
+  <div class="hero-eyebrow">Confuserex — StringEncryption pass</div>
+  <h1>How <strong>string encryption</strong><br>hides secrets in .NET</h1>
+  <p class="hero-sub">A plain-language visual walkthrough of the technique that takes human-readable strings inside a compiled program and replaces them with scrambled bytes — with the key buried in a wall of decoys.</p>
+
+  <div class="pipeline-wrap">
+    <div class="pipeline">
+      <div class="pipeline-flow"></div>
+      <div class="pl-node"><div class="pl-box pl-plain">"Hello"</div><div class="pl-label">plain string</div></div>
+      <div class="pl-arrow"><svg viewBox="0 0 16 16"><path d="M4 8h8M9 5l3 3-3 3"/></svg><div class="pl-dot"></div></div>
+      <div class="pl-node"><div class="pl-box pl-key">key: 42</div><div class="pl-label">random key</div></div>
+      <div class="pl-arrow"><svg viewBox="0 0 16 16"><path d="M4 8h8M9 5l3 3-3 3"/></svg><div class="pl-dot"></div></div>
+      <div class="pl-node"><div class="pl-box pl-enc">"Jgnnq"</div><div class="pl-label">encrypted</div></div>
+      <div class="pl-arrow"><svg viewBox="0 0 16 16"><path d="M4 8h8M9 5l3 3-3 3"/></svg><div class="pl-dot"></div></div>
+      <div class="pl-node"><div class="pl-box pl-bin">binary</div><div class="pl-label">on disk</div></div>
+      <div class="pl-arrow"><svg viewBox="0 0 16 16"><path d="M4 8h8M9 5l3 3-3 3"/></svg><div class="pl-dot"></div></div>
+      <div class="pl-node"><div class="pl-box pl-out">"Hello"</div><div class="pl-label">at runtime</div></div>
+    </div>
+  </div>
+</header>
+
+<hr class="div">
+
+<!-- ANALOGY -->
+<section class="section rv">
+  <div class="sec-label">The idea</div>
+  <h2>Think of it as a secret letter</h2>
+  <p class="sec-intro">Before any code — here is the whole idea using things you can hold in your hands.</p>
+  <div class="analogy-grid">
+    <div class="analogy-item">
+      <div class="an-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></div>
+      <h4>The original string</h4>
+      <p>A letter written in plain handwriting. Anyone who picks it up can read every word immediately.</p>
+    </div>
+    <div class="analogy-item">
+      <div class="an-icon"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="3"/><path d="M11 15h6M8 12V8a4 4 0 0 1 8 0"/></svg></div>
+      <h4>The key</h4>
+      <p>A number you and your friend agreed on beforehand. Like saying "shift every letter forward by 5."</p>
+    </div>
+    <div class="analogy-item">
+      <div class="an-icon"><svg viewBox="0 0 24 24"><path d="M12 3l8 4v5c0 4.4-3.4 8.5-8 9.9C7.4 20.5 4 16.4 4 12V7l8-4z"/></svg></div>
+      <h4>Encrypted string</h4>
+      <p>The letter rewritten with every word scrambled. Anyone who intercepts it sees pure gibberish.</p>
+    </div>
+    <div class="analogy-item">
+      <div class="an-icon"><svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg></div>
+      <h4>Junk numbers</h4>
+      <p>Extra decoy papers stuffed in the envelope so a thief spends hours reading worthless noise.</p>
+    </div>
+    <div class="analogy-item">
+      <div class="an-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M6 20v-1a6 6 0 0 1 12 0v1"/></svg></div>
+      <h4>The Decrypt function</h4>
+      <p>Your friend who knows the real key. They ignore every decoy and unscramble only the real letter.</p>
+    </div>
+    <div class="analogy-item">
+      <div class="an-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+      <h4>Why do this at all?</h4>
+      <p>So a reverse-engineer who opens the compiled program sees scrambled bytes instead of real messages.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="div" style="margin-top:4rem">
+
+<!-- STEPS -->
+<section class="section rv">
+  <div class="sec-label">Step by step</div>
+  <h2>What the code does, in order</h2>
+  <p class="sec-intro">Five things happen for every plain string found in the program.</p>
+  <div class="steps" id="stepsContainer">
+    <div class="step">
+      <div class="step-head">Scan every method for plain strings <span class="tag pu">detect</span></div>
+      <div class="step-body">The code walks through every instruction in every method. When it finds <span style="font-family:JetBrains Mono,monospace;font-size:12px;color:var(--pu);background:var(--pub);padding:1px 5px;border-radius:3px">ldstr "..."</span> — a raw text load — it stops and marks it for encryption.</div>
+    </div>
+    <div class="step">
+      <div class="step-head">Generate a random key <span class="tag am">generate</span></div>
+      <div class="step-body">A random integer is produced per string. Two different strings get two different keys, so there is no shared pattern an attacker can exploit.</div>
+    </div>
+    <div class="step">
+      <div class="step-head">Shift every character forward <span class="tag pu">encrypt</span></div>
+      <div class="step-body">"H" is ASCII 72. With key 5 it becomes ASCII 77 — the letter "M". Every character in the string is shifted by the same amount. The original is gone; what remains is unreadable.</div>
+    </div>
+    <div class="step">
+      <div class="step-head">Inject the call wrapped in junk <span class="tag re">obfuscate</span></div>
+      <div class="step-body">Six new instructions are inserted: the encrypted string, four random junk integers surrounding the real key, and a call to Decrypt. A human reading the bytecode sees a wall of unexplained numbers.</div>
+    </div>
+    <div class="step">
+      <div class="step-head">Decrypt restores the string at runtime <span class="tag gr">decrypt</span></div>
+      <div class="step-body">When the program runs, Decrypt is called. It receives all six values, subtracts the key from each character code, and returns the original. The junk values are accepted as parameters but never read.</div>
+    </div>
+  </div>
+</section>
+
+<hr class="div" style="margin-top:4rem">
+
+<!-- LIVE DEMO -->
+<section class="section rv">
+  <div class="sec-label">Interactive</div>
+  <h2>Watch the cipher in motion</h2>
+  <p class="sec-intro">Type any word and drag the key. Press Encrypt to see each character flip one by one, then Decrypt to reverse it.</p>
+
+  <div class="demo-shell">
+    <div class="demo-topbar">
+      <div class="dot" style="background:#f06060"></div>
+      <div class="dot" style="background:#f0a742"></div>
+      <div class="dot" style="background:#44cc88"></div>
+      <div class="demo-title">string-cipher.live</div>
+    </div>
+    <div class="demo-body">
+      <div class="input-row">
+        <label>word</label>
+        <input type="text" id="wordInput" value="Hello" maxlength="10" spellcheck="false">
+        <label style="margin-left:.4rem">key</label>
+        <input type="range" id="keySlider" min="1" max="30" value="5">
+        <span class="range-val" id="keyDisplay">5</span>
+      </div>
+      <div class="ctrl-row">
+        <button class="dbtn prim" id="encBtn" onclick="runEncrypt()">Encrypt</button>
+        <button class="dbtn" id="decBtn" onclick="runDecrypt()" disabled>Decrypt</button>
+        <button class="dbtn" onclick="resetDemo()">Reset</button>
+        <div class="key-badge" id="keyBadge">key: <span id="livKey">5</span></div>
+      </div>
+      <div class="char-stage" id="charStage"></div>
+      <div class="demo-status" id="demoStatus">waiting — press Encrypt to begin</div>
+    </div>
+  </div>
+</section>
+
+<hr class="div" style="margin-top:4rem">
+
+<!-- INJECT ANIMATION -->
+<section class="section rv">
+  <div class="sec-label">Bytecode injection</div>
+  <h2>How six instructions replace one</h2>
+  <p class="sec-intro">Before encryption a string is a single instruction. After, it becomes seven — one encrypted string, four junk integers, one real key, one Decrypt call.</p>
+
+  <div class="inject-stage">
+    <div class="inject-beam" id="injectBeam"></div>
+    <div class="inject-title">method body</div>
+    <div class="inject-before" id="injectBody">
+      <div class="inject-instr" id="iLdstr">
+        <span class="i-op">ldstr</span><span class="i-arg" id="ldstrArg">"Hello"</span>
+      </div>
+      <div class="inject-instr">
+        <span class="i-op">call</span><span class="i-arg" style="color:var(--mu)">void Console.WriteLine(string)</span>
+      </div>
+    </div>
+    <button class="inject-play-btn" id="injectPlayBtn" onclick="runInject()">Run injection pass</button>
+  </div>
+</section>
+
+<hr class="div" style="margin-top:4rem">
+
+<!-- CIPHER TABLE -->
+<section class="section rv">
+  <div class="sec-label">The cipher</div>
+  <h2>The maths behind each character</h2>
+  <p class="sec-intro">Every character is just a number. Encrypt adds the key. Decrypt subtracts it. A Caesar cipher applied to ASCII codes.</p>
+  <div class="cipher-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>char</th><th>code</th><th></th><th>enc code</th><th>enc char</th><th></th><th>restored</th><th>restored char</th>
+        </tr>
+      </thead>
+      <tbody id="cipherBody"></tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="div" style="margin-top:4rem">
+
+<!-- BYTECODE VIEWER -->
+<section class="section rv">
+  <div class="sec-label">IL bytecode</div>
+  <h2>What the instructions look like after</h2>
+  <p class="sec-intro">One string becomes seven instructions. Toggle junk to see how hard it is to spot the real key.</p>
+  <div class="bc-wrap">
+    <div class="bc-head">
+      <span class="bc-title">method body — post-encryption pass</span>
+      <button class="bc-toggle" id="junkBtn" onclick="toggleJunk()">hide junk</button>
+    </div>
+    <div class="bc-body bc-scan" id="bcBody"></div>
+  </div>
+</section>
+
+<hr class="div" style="margin-top:4rem">
+
+<!-- DECRYPT PARAMS -->
+<section class="section rv">
+  <div class="sec-label">The Decrypt function</div>
+  <h2>Six parameters — only two matter</h2>
+  <p class="sec-intro">Decrypt receives every value. It uses only the encrypted string and the key. The four junk integers are received, evaluated in dead-code conditions, and silently discarded.</p>
+  <div class="dec-split">
+    <div class="dec-panel used">
+      <h4>parameters used</h4>
+      <div class="pline"><span class="pname">str</span><span class="pval" id="pStr">"Mjqqt"</span><span class="ptag">used</span></div>
+      <div class="pline"><span class="pname">key</span><span class="pval" id="pKey">5</span><span class="ptag">used</span></div>
+    </div>
+    <div class="dec-panel ignore">
+      <h4>parameters ignored</h4>
+      <div class="pline"><span class="pname">min</span><span class="pval" id="jA">84729</span><span class="ptag">ignored</span></div>
+      <div class="pline"><span class="pname">hash</span><span class="pval" id="jB">39201</span><span class="ptag">ignored</span></div>
+      <div class="pline"><span class="pname">length</span><span class="pval" id="jC">11847</span><span class="ptag">ignored</span></div>
+      <div class="pline"><span class="pname">max</span><span class="pval" id="jD">99034</span><span class="ptag">ignored</span></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:1rem;border-left:3px solid var(--pu2);border-radius:0 10px 10px 0">
+    <div class="card-title">The dead-code conditions</div>
+    <p>Inside Decrypt are statements like <span style="font-family:JetBrains Mono,monospace;font-size:12px;color:var(--mu)">if (max > 78787878) ;</span> — empty bodies, no effect. They exist only to make the function look complex so automated analysis tools classify it as non-trivial and spend more time on it.</p>
+  </div>
+</section>
+
+<hr class="div" style="margin-top:4rem">
+
+<!-- WHY JUNK -->
+<section class="section rv">
+  <div class="sec-label">Purpose</div>
+  <h2>Why surround the key with noise?</h2>
+  <div class="card">
+    <div class="card-title">Without junk</div>
+    <p>The encrypted string and the key sit adjacent. An automated tool reads them in sequence, pairs them instantly, and decrypts the entire program in milliseconds.</p>
+  </div>
+  <div class="card">
+    <div class="card-title">With junk</div>
+    <p>The real key is one of five integers passed to Decrypt. All five look identical in the signature. An automated tool must analyse the function body to figure out which argument is actually used — raising the cost of automated reversal significantly.</p>
+  </div>
+  <div class="card" style="border-color:var(--am2)">
+    <div class="card-title" style="color:var(--am)">Limitation</div>
+    <p>This is a Caesar cipher — one of the oldest and weakest ciphers known. It provides obfuscation, not cryptographic security. A determined analyst who recognises the pattern can write a decryptor in a few minutes. The goal is to slow casual analysis, not to protect genuinely sensitive data.</p>
+  </div>
+</section>
+
+</div>
+<script>
+const $ = id => document.getElementById(id);
+
+/* ── scroll reveal ── */
+const rObs = new IntersectionObserver(entries => {
+  entries.forEach(e => { if(e.isIntersecting){ e.target.classList.add('in'); rObs.unobserve(e.target); } });
+}, { threshold: 0.07 });
+document.querySelectorAll('.rv').forEach(el => rObs.observe(el));
+
+/* ── step stagger reveal ── */
+const sObs = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if(e.isIntersecting){
+      const steps = e.target.querySelectorAll('.step');
+      steps.forEach((s,i) => setTimeout(() => s.classList.add('vis'), i*140));
+      sObs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.1 });
+const sc = $('stepsContainer');
+if(sc) sObs.observe(sc);
+
+/* ── state ── */
+let demoState='plain', currentWord='Hello', currentKey=5;
+const getWord=()=>{const v=$('wordInput').value.trim();return v.length?v.slice(0,10):'Hello'};
+const getKey =()=>parseInt($('keySlider').value);
+
+$('keySlider').addEventListener('input',()=>{
+  currentKey=getKey();
+  $('keyDisplay').textContent=currentKey;
+  $('livKey').textContent=currentKey;
+  rebuildCipher();rebuildBytecode();updateDecryptPanel();
+});
+$('wordInput').addEventListener('input',()=>{
+  if(demoState!=='plain')return;
+  currentWord=getWord();
+  buildPlain();rebuildCipher();rebuildBytecode();
+});
+
+/* ── char stage ── */
+function buildPlain(){
+  currentWord=getWord(); currentKey=getKey();
+  const stage=$('charStage'); stage.innerHTML='';
+  for(const c of currentWord){
+    const cell=document.createElement('div'); cell.className='char-cell';
+    const ltr=document.createElement('div'); ltr.className='char-letter';
+    const inner=document.createElement('span'); inner.textContent=c; ltr.appendChild(inner);
+    const rip=document.createElement('div'); rip.className='ripple'; ltr.appendChild(rip);
+    const top=document.createElement('div'); top.className='char-code-top'; top.textContent='chr';
+    const bot=document.createElement('div'); bot.className='char-code-bot'; bot.textContent=c.charCodeAt(0);
+    cell.appendChild(top); cell.appendChild(ltr); cell.appendChild(bot);
+    stage.appendChild(cell);
+  }
+  setStatus('waiting — press Encrypt to begin','');
+  demoState='plain';
+  $('encBtn').disabled=false; $('decBtn').disabled=true;
+}
+
+function animRipple(letterEl, color){
+  const rip=letterEl.querySelector('.ripple');
+  rip.style.background=color; rip.style.opacity='0.5';
+  rip.style.transition='opacity .3s';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ rip.style.opacity='0'; }));
+}
+
+function showCounter(cellEl, text, color){
+  const ctr=document.createElement('div');
+  ctr.className='counter';
+  ctr.textContent=text;
+  ctr.style.color=color;
+  ctr.style.animation='counterUp .55s ease forwards';
+  cellEl.style.position='relative';
+  cellEl.appendChild(ctr);
+  setTimeout(()=>ctr.remove(),600);
+}
+
+function burst(letterEl, color){
+  const rect=letterEl.getBoundingClientRect();
+  const stageRect=$('charStage').getBoundingClientRect();
+  const cx=rect.left-stageRect.left+rect.width/2;
+  const cy=rect.top-stageRect.top+rect.height/2;
+  for(let i=0;i<8;i++){
+    const p=document.createElement('div'); p.className='particle';
+    const angle=(i/8)*Math.PI*2;
+    const dist=28+Math.random()*18;
+    p.style.cssText=`left:${cx}px;top:${cy}px;background:${color};--tx:${Math.cos(angle)*dist}px;--ty:${Math.sin(angle)*dist}px;animation:particleBurst .5s ease forwards`;
+    $('charStage').appendChild(p);
+    setTimeout(()=>p.remove(),520);
+  }
+}
+
+function runEncrypt(){
+  if(demoState!=='plain')return;
+  demoState='encrypting';
+  $('encBtn').disabled=true;
+  setStatus('shifting each character forward by key '+currentKey+'...','enc');
+  const cells=$('charStage').children;
+  let i=0;
+  function step(){
+    if(i>=cells.length){
+      demoState='encrypted';
+      setStatus('encrypted — stored in program binary','enc');
+      $('decBtn').disabled=false;
+      // final burst on all chars
+      setTimeout(()=>{
+        Array.from(cells).forEach(c=>burst(c.querySelector('.char-letter'),'#f2a83c'));
+      },80);
+      return;
+    }
+    const cell=cells[i];
+    const ltr=cell.querySelector('.char-letter');
+    const inner=ltr.querySelector('span');
+    const bot=cell.querySelector('.char-code-bot');
+    const orig=currentWord.charCodeAt(i);
+    const enc=orig+currentKey;
+    animRipple(ltr,'#f2a83c');
+    showCounter(cell,'+'+currentKey,'#f2a83c');
+    setTimeout(()=>{
+      inner.textContent=String.fromCharCode(enc);
+      bot.textContent=enc;
+      ltr.classList.add('enc');
+      cell.classList.add('enc');
+      i++;
+      setTimeout(step,110);
+    },150);
+  }
+  step();
+}
+
+function runDecrypt(){
+  if(demoState!=='encrypted')return;
+  demoState='decrypting';
+  $('decBtn').disabled=true;
+  setStatus('Decrypt called — subtracting key '+currentKey+'...','dec');
+  const cells=$('charStage').children;
+  let i=0;
+  function step(){
+    if(i>=cells.length){
+      demoState='decrypted';
+      setStatus('original string restored','dec');
+      setTimeout(()=>{
+        Array.from(cells).forEach(c=>burst(c.querySelector('.char-letter'),'#44cc88'));
+      },80);
+      return;
+    }
+    const cell=cells[i];
+    const ltr=cell.querySelector('.char-letter');
+    const inner=ltr.querySelector('span');
+    const bot=cell.querySelector('.char-code-bot');
+    const orig=currentWord.charCodeAt(i);
+    animRipple(ltr,'#44cc88');
+    showCounter(cell,'-'+currentKey,'#44cc88');
+    setTimeout(()=>{
+      inner.textContent=currentWord[i];
+      bot.textContent=orig;
+      ltr.classList.remove('enc');
+      ltr.classList.add('dec');
+      cell.classList.remove('enc');
+      cell.classList.add('dec');
+      i++;
+      setTimeout(step,110);
+    },150);
+  }
+  step();
+}
+
+function resetDemo(){
+  demoState='plain'; currentWord=getWord(); currentKey=getKey();
+  buildPlain();
+}
+
+function setStatus(msg,cls){
+  const s=$('demoStatus'); s.textContent=msg;
+  s.className='demo-status'+(cls?' '+cls:'');
+}
+
+/* ── cipher table ── */
+function rebuildCipher(){
+  const w=getWord(), k=getKey(), body=$('cipherBody');
+  body.innerHTML='';
+  for(let i=0;i<w.length;i++){
+    const c=w[i], orig=c.charCodeAt(0), enc=orig+k;
+    const tr=document.createElement('tr');
+    tr.style.animationDelay=(i*40)+'ms';
+    tr.innerHTML=`<td class="tc-orig">'${c}'</td><td class="tc-orig">${orig}</td><td class="tc-op">+ ${k}</td><td class="tc-enc">${enc}</td><td class="tc-enc">'${String.fromCharCode(enc)}'</td><td class="tc-op">- ${k}</td><td class="tc-dec">${orig}</td><td class="tc-dec">'${c}'</td>`;
+    body.appendChild(tr);
+  }
+}
+
+/* ── bytecode ── */
+let junkVisible=true;
+function rebuildBytecode(){
+  const w=getWord(), k=getKey();
+  const enc=[...w].map(c=>String.fromCharCode(c.charCodeAt(0)+k)).join('');
+  const j=[rnd(),rnd(),rnd(),rnd()];
+  $('jA').textContent=j[0]; $('jB').textContent=j[1]; $('jC').textContent=j[2]; $('jD').textContent=j[3];
+  const instrs=[
+    {cls:'ireal',op:'ldstr',arg:`"${enc}"`,tag:'encrypted string'},
+    {cls:'ijunk',op:'ldc.i4',arg:j[0],tag:'junk (min)',junk:true},
+    {cls:'ireal',op:'ldc.i4',arg:k,tag:'real key'},
+    {cls:'ijunk',op:'ldc.i4',arg:j[1],tag:'junk (hash)',junk:true},
+    {cls:'ijunk',op:'ldc.i4',arg:j[2],tag:'junk (length)',junk:true},
+    {cls:'ijunk',op:'ldc.i4',arg:j[3],tag:'junk (max)',junk:true},
+    {cls:'icall',op:'call',arg:'string Decrypt(...)',tag:'restores original'},
+  ];
+  const body=$('bcBody'); body.innerHTML='';
+  instrs.forEach((ins,idx)=>{
+    if(ins.junk&&!junkVisible)return;
+    const row=document.createElement('div');
+    row.className='instr '+ins.cls+' entering';
+    row.style.animationDelay=(idx*35)+'ms';
+    row.innerHTML=`<span class="i-op">${ins.op}</span><span class="i-arg">${ins.arg}</span><span class="i-tag">${ins.tag}</span>`;
+    body.appendChild(row);
+  });
+}
+function toggleJunk(){
+  junkVisible=!junkVisible;
+  $('junkBtn').textContent=junkVisible?'hide junk':'show junk';
+  rebuildBytecode();
+}
+function rnd(){return Math.floor(Math.random()*98000+1000)}
+
+/* ── decrypt panel ── */
+function updateDecryptPanel(){
+  const w=getWord(), k=getKey();
+  const enc=[...w].map(c=>String.fromCharCode(c.charCodeAt(0)+k)).join('');
+  $('pStr').textContent='"'+enc+'"';
+  $('pKey').textContent=k;
+}
+
+/* ── INJECT ANIMATION ── */
+let injecting=false;
+function runInject(){
+  if(injecting)return;
+  injecting=true;
+  $('injectPlayBtn').disabled=true;
+  const word=getWord(), key=getKey();
+  const encWord=[...word].map(c=>String.fromCharCode(c.charCodeAt(0)+key)).join('');
+  const j=[rnd(),rnd(),rnd(),rnd()];
+
+  // Step 1: highlight the ldstr
+  const ldstrEl=$('iLdstr');
+  ldstrEl.classList.add('highlight');
+  $('ldstrArg').textContent='"'+encWord+'"';
+
+  const beam=$('injectBeam');
+  beam.style.height='100%';
+
+  // Step 2: inject new instructions one by one
+  const newInstrs=[
+    {cls:'ijunk',op:'ldc.i4',arg:j[0],tag:'junk (min)'},
+    {cls:'ireal',op:'ldc.i4',arg:key, tag:'real key'},
+    {cls:'ijunk',op:'ldc.i4',arg:j[1],tag:'junk (hash)'},
+    {cls:'ijunk',op:'ldc.i4',arg:j[2],tag:'junk (length)'},
+    {cls:'ijunk',op:'ldc.i4',arg:j[3],tag:'junk (max)'},
+    {cls:'icall',op:'call',  arg:'string Decrypt(...)',tag:'restores original'},
+  ];
+
+  const body=$('injectBody');
+  // insert after ldstr (index 0)
+  const ref=body.children[1]; // the Console.WriteLine row
+
+  let i=0;
+  function nextInstr(){
+    if(i>=newInstrs.length){
+      beam.style.height='0';
+      setTimeout(()=>{
+        injecting=false;
+        $('injectPlayBtn').disabled=false;
+        $('injectPlayBtn').textContent='Run again';
+      },400);
+      return;
+    }
+    const ins=newInstrs[i];
+    const el=document.createElement('div');
+    el.className='inject-instr new-instr '+ins.cls;
+    el.innerHTML=`<span class="i-op">${ins.op}</span><span class="i-arg">${ins.arg}</span><span class="i-tag">${ins.tag}</span>`;
+    body.insertBefore(el,ref);
+    requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('pop')));
+    i++;
+    setTimeout(nextInstr,300);
+  }
+  setTimeout(nextInstr,500);
+}
+
+/* ── init ── */
+buildPlain();
+rebuildCipher();
+rebuildBytecode();
+updateDecryptPanel();
+</script>
+</body>
+</html>
